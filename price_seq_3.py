@@ -38,8 +38,8 @@ standard_scaler = StandardScaler()
 standard_scaler.fit(data)
 d = standard_scaler.transform(data)
 
-MAX_RANGE = 6
-timeseries = 5
+MAX_RANGE = 10
+timeseries = 1
 
 num = int(len(d) / MAX_RANGE)
 start = len(d) - num * MAX_RANGE
@@ -68,23 +68,28 @@ x_train, x_test = train_test_split(d_seq)
 print('building model encoder-decoder model...')
 
 input = Input(shape=(d_seq.shape[1], d_seq.shape[2]))
-encoder = Bidirectional(LSTM(3, return_sequences=True))(input)
-decoder = Bidirectional(LSTM(3, return_sequences=True))(encoder)
+encoder = Bidirectional(LSTM(int(MAX_RANGE/2), return_sequences=True, kernel_regularizer='l2'))(input)
+decoder = Bidirectional(LSTM(int(MAX_RANGE/2), return_sequences=True, kernel_regularizer='l2'))(encoder)
 
 sequence_autoencoder = Model(input, decoder)
 encoder_model = Model(input, encoder)
 
 print('compiling model...')
 sequence_autoencoder.compile(optimizer='nadam', loss='mse', metrics=['accuracy'])
+print(sequence_autoencoder.summary())
 
-history_o = sequence_autoencoder.fit(x_train, x_train, epochs=10000, validation_split=0.3, batch_size=64, shuffle=True)
+print('fitting model...')
+history_o = sequence_autoencoder.fit(x_train, x_train, epochs=5, validation_split=0.3, batch_size=64, shuffle=True)
 
 plt.plot(history_o.history['acc'])
+plt.plot(history_o.history['loss'])
 plt.show()
 
+print('predicting....')
 prediction = encoder_model.predict(d_seq)
 print(prediction.shape)
 
+print('deconstructing to timeseries...')
 pred = np.empty((len(d),))
 for i in range(prediction.shape[0]):
     for j in range(prediction.shape[1]):

@@ -8,13 +8,20 @@ from sklearn.manifold import MDS
 
 timesteps = 5
 input_dim = 10
-x = np.random.uniform(0., 1., size=(100, timesteps, input_dim))
+x = np.random.uniform(0., 1., size=(1000, timesteps, input_dim))
 
 print('building model encoder-decoder model...')
 
 input = Input(shape=(timesteps, input_dim))
-encoder = Bidirectional(LSTM(timesteps, return_sequences=True))(input)
-decoder = Bidirectional(LSTM(timesteps, return_sequences=True))(encoder)
+encoder = Bidirectional(LSTM(
+        timesteps,
+        return_sequences=True,
+        kernel_regularizer='l2'
+        ))(input)
+decoder = Bidirectional(LSTM(
+        timesteps,
+        return_sequences=True,
+        kernel_regularizer='l2'))(encoder)
 
 sequence_autoencoder = Model(input, decoder)
 encoder_model = Model(input, encoder)
@@ -25,8 +32,14 @@ sequence_autoencoder.compile(optimizer='nadam', loss='mse', metrics=['accuracy']
 print(sequence_autoencoder.summary())
 x_train, x_val = train_test_split(x)
 x_train, x_test = train_test_split(x_train)
+
 print('training model...')
-history_o = sequence_autoencoder.fit(x_train, x_train, batch_size=32, epochs=1000, validation_data=(x_val, x_val))
+history_o = sequence_autoencoder.fit(
+    x_train,
+    x_train,
+    batch_size=32,
+    epochs=2000,
+    validation_data=(x_val, x_val))
 
 print('predicting...')
 pred = encoder_model.predict(x_test)
@@ -54,5 +67,6 @@ plt.plot(xx_test, 'o', color='red')
 plt.plot(ppred, 'o', color='yellow')
 plt.show()
 
+plt.plot(history_o.history['loss'])
 plt.plot(history_o.history['acc'])
 plt.show()

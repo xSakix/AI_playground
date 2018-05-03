@@ -78,7 +78,7 @@ if not os.path.isfile(d_seq_file):
         index = 0
         for j in range(i, len(data)):
             if index > 0 and index % MAX_RANGE == 0:
-                d_seq.append(np.reshape(sub, (1, 30)))
+                d_seq.append(np.reshape(sub, (1, MAX_RANGE)))
                 sub = np.empty((MAX_RANGE,))
                 index = 0
             sub[index] = data[j]
@@ -94,16 +94,22 @@ print(d_seq.shape)
 x_train, x_test = train_test_split(d_seq)
 
 m = Sequential()
-m.add(LSTM(15, input_shape=(d_seq[0].shape[0], d_seq[0].shape[1]), return_sequences=True))
-m.add(Dropout(0.2))
-m.add(LSTM(MAX_RANGE, return_sequences=True))
+m.add(LSTM(
+        15,
+        input_shape=(d_seq[0].shape[0], d_seq[0].shape[1]),
+        return_sequences=True,
+        dropout=0.2,
+        kernel_regularizer='l2'))
+m.add(LSTM(
+        MAX_RANGE,
+        return_sequences=True,
+        kernel_regularizer='l2'))
 
-# m.compile(loss='mean_squared_logarithmic_error', optimizer='sgd', metrics=['accuracy'])
-m.compile(loss='mse', optimizer='sgd', metrics=['accuracy'])
+m.compile(loss='mse', optimizer='nadam', metrics=['accuracy'])
 
 print(m.summary())
 
-History = m.fit(x_train, x_train, epochs=20, validation_data=(x_test, x_test), batch_size=64, shuffle=True)
+History = m.fit(x_train, x_train, epochs=5, validation_data=(x_test, x_test), batch_size=64, shuffle=True)
 
 plt.plot(History.history['loss'])
 plt.plot(History.history['val_loss'])
