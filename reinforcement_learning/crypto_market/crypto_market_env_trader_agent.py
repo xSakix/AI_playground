@@ -10,12 +10,14 @@ from etf_data_loader import load_all_data_from_file2
 import numpy as np
 import matplotlib.pyplot as plt
 
+dir_data = 'data_ltc_btc/'
+dir_models = 'models_ltc_btc/'
+ticket = 'LTC-BTC'
 # start_date = '2010-01-01'
 # start_date = '2017-10-01'
 start_date = '2017-01-01'
-end_date = '2018-06-11'
+end_date = '2018-06-15'
 prefix = 'btc_'
-ticket = 'BTC-USD'
 
 df_adj_close = load_all_data_from_file2(prefix + 'etf_data_adj_close.csv', start_date, end_date)
 
@@ -36,24 +38,27 @@ plt.plot(df_ticket_data[[ticket]])
 plt.show()
 
 data = df_ticket_data
-# models = sorted(os.listdir('models'))
+models = sorted(os.listdir(dir_models))
 # models = [
-#         'decision_tree_1.pkl',
-#         'decision_tree_4.pkl',
-#         'decision_tree_5.pkl',
-#         'decision_tree_7.pkl',
-#         'decision_tree_9.pkl',
-#         'decision_tree_18.pkl']
-models = [
-    'decision_tree_4.pkl',
-]
+#         'models_eu/btc_eur_adaboost_15.pkl',
+#         'models_eu/btc_eur_mlp_8.pkl',
+#         'models_eu/btc_eur_decision_tree_11.pkl',
+#         # 'keras_model_eu/lstm_1.h5',
+#         # 'keras_model_eu/mlp_2.h5',
+#         # 'keras_model_eu/mlp_3.h5',
+#         'keras_model_eu/mlpp_5.h5']
 
 legends = ['benchmark']
 
 plt.plot(data[[ticket]].pct_change().cumsum().as_matrix())
 
+count = 0
+max = -1.
+max_agent = None
+
 for model in models:
-    agent = CryptoTraderAgent(ticket, model='models/' + str(model))
+    print(model)
+    agent = CryptoTraderAgent(ticket, model=dir_models+str(model), binarizer='keras_model_eu/label_bin.pkl')
     agent.invest(data[[ticket]], window=30)
 
     plt.plot(agent.ror_history)
@@ -71,5 +76,21 @@ for model in models:
     print('shares:', agent.shares)
     print('value:', agent.history[-1])
 
+    if max < agent.ror_history[-1]:
+        max =agent.ror_history[-1]
+        max_agent = agent
+
+    count += 1
+
+    if count == len(models) or count == 3:
+        plt.legend(legends)
+        plt.show()
+        count = 0
+        legends = ['benchmark']
+
+        plt.plot(data[[ticket]].pct_change().cumsum().as_matrix())
+
+legends.append(max_agent.model)
+plt.plot(max_agent.ror_history)
 plt.legend(legends)
 plt.show()

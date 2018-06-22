@@ -15,7 +15,6 @@ def get_model(input_dim):
     model.add(Dense(256, activation='relu', input_dim=input_dim))
     model.add(Dense(512, activation='relu'))
     model.add(Dense(1024, activation='relu'))
-    # model.add(Dense(256, activation=LeakyReLU()))
     model.add(Dense(3, activation='softmax'))
 
     model.compile(optimizer='rmsprop', loss='sparse_categorical_crossentropy', metrics=['categorical_accuracy'])

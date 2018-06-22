@@ -11,6 +11,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
+dir_data = 'data_ltc_eur/'
+dir_models = 'models_ltc_eur/'
+ticket = 'LTC_EUR'
+
+
 start_date = '2017-01-01'
 end_date = '2018-06-01'
 df_adj_close = load_all_data_from_file('btc_data_open.csv', start_date, end_date)

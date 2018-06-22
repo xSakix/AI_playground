@@ -14,9 +14,9 @@ import matplotlib.pyplot as plt
 # start_date = '2010-01-01'
 # start_date = '2017-10-01'
 start_date = '2017-01-01'
-end_date = '2018-06-10'
+end_date = '2018-06-15'
 prefix = 'btc_'
-ticket = 'BTC-USD'
+ticket = 'BTC-EUR'
 
 df_adj_close = load_all_data_from_file2(prefix + 'etf_data_adj_close.csv', start_date, end_date)
 
@@ -60,13 +60,14 @@ print('cash:', agent.cash)
 print('shares:', agent.shares)
 print('value:', agent.history[-1])
 
+# models = os.listdir('models')
+
 models = [
-        'decision_tree_4.pkl',
-        'decision_tree_9.pkl']
+        'btc_eur_adaboost_15.pkl']
 
 
 for model in models:
-    agent = CryptoTraderAgent(ticket, model='models/'+str(model))
+    agent = CryptoTraderAgent(ticket, model='models_eu/'+str(model))
     agent.invest(data[[ticket]], window=30)
 
     plt.plot(agent.ror_history)

@@ -1,13 +1,58 @@
 import pandas as pd
 
 import numpy as np
+from keras import Sequential
+from keras.layers import Bidirectional, LSTM, Dense, Dropout
 from sklearn.externals import joblib
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
 
 
+def load_lstm(input_shape, model_src):
+    model = Sequential()
+
+    model.add(Bidirectional(LSTM(32, return_sequences=True), input_shape=input_shape))
+    model.add(LSTM(32))
+    model.add(Dense(3, activation='softmax'))
+
+    model.load_weights(model_src)
+
+    return model
+
+
+def load_mlp_model(input_dim, model_src):
+    model = Sequential()
+
+    model.add(Dense(32, activation='relu', input_dim=input_dim))
+    model.add(Dense(32, activation='relu'))
+    model.add(Dense(32, activation='relu'))
+    model.add(Dense(3, activation='softmax'))
+
+    model.load_weights(model_src)
+    return model
+
+def load_mlpp_model(input_dim, model_src):
+    model = Sequential()
+
+    model.add(Dense(256, activation='relu', input_dim=input_dim))
+    model.add(Dropout(0.1))
+    model.add(Dense(256, activation='relu'))
+    model.add(Dropout(0.2))
+    model.add(Dense(3, activation='softmax', kernel_regularizer='l1_l2'))
+
+    model.load_weights(model_src)
+    return model
+
+
+
+def load_scaler(src):
+    return joblib.load(src)
+
+
 class CryptoTraderAgent:
-    def __init__(self, ticket, model='models/decision_tree.pkl', invested=100000.):
+    def __init__(self, ticket, model='models/decision_tree.pkl', invested=100000.,
+                 scaler='keras_model_eu/standard_scaler.pkl',
+                 binarizer=None):
         self.r_actions = []
         self.score = 0
         self.ror_history = []
@@ -20,7 +65,32 @@ class CryptoTraderAgent:
         self.history = []
         self.actions = []
         self.state = []
-        self.clf = joblib.load(model)
+        self.model = model
+
+        self.iskeras = False
+        self.ismlp = False
+        self.scaler = None
+        self.binarizer = None
+
+        if model.startswith('keras') and model.__contains__('lstm'):
+            self.clf = load_lstm((1, 5), model_src=model)
+            self.iskeras = True
+            self.scaler = load_scaler(scaler)
+
+        if model.startswith('keras') and model.__contains__('mlp'):
+            if model.__contains__('mlpp'):
+                self.clf = load_mlpp_model(5, model_src=model)
+                self.binarizer = joblib.load(binarizer)
+            else:
+                self.clf = load_mlp_model(5, model_src=model)
+            self.scaler = load_scaler(scaler)
+            self.iskeras = True
+            self.ismlp = True
+
+        if model.startswith('models'):
+            self.clf = joblib.load(model)
+            self.iskeras = False
+
         self.coef = 0.5
 
     def invest(self, data, window=30):
@@ -60,16 +130,29 @@ class CryptoTraderAgent:
 
             self.ror_history[i] = ror
 
-            input = [[self.ror_history[i],
-                      bench[i],
-                      pct[i - 1],
+            input = [[pct[i - 1],
                       lowerbb[i - 1],
                       mean[i - 1],
                       median[i - 1],
                       upperbb[i - 1]]]
             input = np.array(input)
 
-            action = self.clf.predict(input[:, 2:7])
+            if self.iskeras:
+                if not self.ismlp:
+                    x = np.reshape(input, (1, 5))
+                    x = self.scaler.transform(x)
+                    if self.binarizer is not None:
+                        action = self.clf.predict(np.reshape(x, (1, 1, 5)))
+                        action = self.binarizer.inverse_transform(action)
+                    else:
+                        action = np.argmax(self.clf.predict(np.reshape(x, (1, 1, 5))), axis=1)
+                else:
+                    x = np.reshape(input, (1, 5))
+                    x = self.scaler.transform(x)
+                    action = np.argmax(self.clf.predict(x), axis=1)
+            else:
+                action = self.clf.predict(np.reshape(input, (1, 5)))
+
             self.state.append(input)
             self.r_actions.append(action)
 

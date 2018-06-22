@@ -47,8 +47,12 @@ def clean_data(df_adj_close, ticket):
                     break
     return df_adj_close
 
+dir_data = 'data_ltc_btc/'
+dir_models = 'models_ltc_btc/'
+ticket = 'LTC-BTC'
 
-start_date = '1993-01-01'
+
+start_date = '2015-08-07'
 end_date = '2018-01-01'
 prefix = 'btc_'
 df_adj_close = load_all_data_from_file2(prefix + 'etf_data_adj_close.csv', start_date, end_date)
@@ -62,9 +66,12 @@ max = None
 
 found = {}
 
-ticket = 'BTC-USD'
+# models = [
+#         'btc_eur_adaboost_15.pkl',
+#         ]
 
-agents = [CryptoTraderAgent(ticket, model='models/' + model) for model in os.listdir('models')]
+models = os.listdir(dir_models)
+agents = [CryptoTraderAgent(ticket, model=dir_models + model) for model in models]
 
 # data = get_data_random_dates(df_adj_close, 2010, 2018)
 data = df_adj_close
@@ -96,8 +103,8 @@ print(x.shape)
 y = np.array(y_train)
 print(y.shape)
 
-np.save('x.npy', x)
-np.save('y.npy', y)
+np.save(dir_data+'x.npy', x)
+np.save(dir_data+'y.npy', y)
 
 for idx in range(len(counts)):
     print(idx, ' : ', counts[idx])
