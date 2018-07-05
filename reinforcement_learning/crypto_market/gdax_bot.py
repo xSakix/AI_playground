@@ -243,7 +243,7 @@ def main_loop(order=None):
 
     shares, cash = get_account_balance(auth)
 
-    print('Current state(%s):%.4f,%.4f' % (PAIR, shares, cash))
+    # print('Current state(%s):%.4f,%.4f' % (PAIR, shares, cash))
 
     history_data = load_history_data()
 

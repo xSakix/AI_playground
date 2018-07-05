@@ -47,13 +47,13 @@ def clean_data(df_adj_close, ticket):
                     break
     return df_adj_close
 
-dir_data = 'data_ltc_btc/'
-dir_models = 'models_ltc_btc/'
-ticket = 'LTC-BTC'
 
+dir_data = 'data_btc_eur/'
+dir_models = 'models_btc_eur/'
+ticket = 'BTC-EUR'
 
 start_date = '2015-08-07'
-end_date = '2018-01-01'
+end_date = '2018-06-15'
 prefix = 'btc_'
 df_adj_close = load_all_data_from_file2(prefix + 'etf_data_adj_close.csv', start_date, end_date)
 
@@ -66,14 +66,9 @@ max = None
 
 found = {}
 
-# models = [
-#         'btc_eur_adaboost_15.pkl',
-#         ]
-
 models = os.listdir(dir_models)
 agents = [CryptoTraderAgent(ticket, model=dir_models + model) for model in models]
 
-# data = get_data_random_dates(df_adj_close, 2010, 2018)
 data = df_adj_close
 data = data[[ticket]]
 
@@ -83,14 +78,16 @@ for agent in agents:
 x_train = []
 y_train = []
 
-[print(len(agent.ror_history)) for agent in agents]
-[print(len(agent.r_actions)) for agent in agents]
-
+# [print(len(agent.ror_history)) for agent in agents]
+[print(len(agent.scores), len(agent.r_actions), len(agent.state)) for agent in agents]
+print('->', len(data))
 counts = np.zeros(len(agents), dtype=np.int32)
 
-for i in range(31, len(data)):
-    rors = np.array([agent.ror_history[i] for agent in agents])
-    idx = np.argmax(rors)
+for i in range(31,len(data)):
+    # rors = np.array([agent.ror_history[i] for agent in agents])
+    scores = np.array([agent.scores[i-31] for agent in agents])
+    # idx = np.argmax(rors)
+    idx = np.argmax(scores)
     counts[idx] += 1
     try:
         x_train.append(agents[idx].state[i - 31])
@@ -103,8 +100,8 @@ print(x.shape)
 y = np.array(y_train)
 print(y.shape)
 
-np.save(dir_data+'x.npy', x)
-np.save(dir_data+'y.npy', y)
+np.save(dir_data + 'x.npy', x)
+np.save(dir_data + 'y.npy', y)
 
 for idx in range(len(counts)):
-    print(idx, ' : ', counts[idx])
+    print(models[idx], ' : ', counts[idx])

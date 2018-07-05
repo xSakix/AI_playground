@@ -13,21 +13,22 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
-dir_data = 'data_ltc_btc/'
-dir_models = 'models_ltc_btc/'
-ticket = 'LTC_BTC'
+dir_data = 'data_btc_eur/'
+models = [d for d in os.listdir('.') if d.startswith('models_btc_eur')]
+dir_models = 'models_btc_eur_'+str(len(models)+1)+'/'
 
-factor = 1
+if not os.path.isdir(dir_models):
+    print('creating dir...'+dir_models)
+    os.makedirs(dir_models)
+
+ticket = 'BTC_EUR'
 
 print('loading data...')
 x = np.load(dir_data + 'x.npy')
 print(x.shape)
-
 x = np.nan_to_num(x)
-x = np.repeat(x, factor, axis=0)
 
 y_orig = np.load(dir_data + 'y.npy')
-y_orig = np.repeat(y_orig, factor, axis=0)
 
 print('reshaping data...')
 if len(x.shape) > 2:
@@ -38,7 +39,6 @@ if x.shape[1] == 7:
     x = x[:, 2:7]
 
 print(x.shape)
-print('scaling data...')
 
 print('min:', np.min(x))
 print('max:', np.max(x))
@@ -49,20 +49,16 @@ if len(y_orig.shape) > 1:
     y = y_orig.reshape(y_orig.shape[0]*y_orig.shape[1])
 else:
     y = y_orig
-print('x:', x.shape)
 print('y_orig:', y.shape)
 
 unique, counts = np.unique(y_orig, return_counts=True)
 print(dict(zip(unique, counts)))
 
 print('spliting data...')
-print(x.shape)
-print(y.shape)
-
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=2)
 
 print('getting model...RandomForest')
-clf = RandomForestClassifier(verbose=True)
+clf = RandomForestClassifier(verbose=False)
 
 print('training...')
 clf.fit(x, y)

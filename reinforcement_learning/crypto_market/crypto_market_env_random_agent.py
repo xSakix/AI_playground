@@ -1,9 +1,9 @@
+import os
 from reinforcement_learning.crypto_market.crypto_random_agent import CryptoRandomAgent
-
 import sys
+from reinforcement_learning.crypto_market.crypto_trader_agent import CryptoTraderAgent
 
 sys.path.insert(0, '../../../etf_data')
-from etf_data_loader import load_all_data_from_file
 from etf_data_loader import load_all_data_from_file2
 
 import pandas as pd
@@ -45,13 +45,14 @@ def clean_data(df_adj_close, ticket):
     return df_adj_close
 
 
-start_date = '2015-01-01'
-# start_date = '2018-01-01'
+# start_date = '2011-08-27'
+start_date = '2017-10-01'
+# start_date = '2017-11-01'
 # end_date = '2018-04-01'
-end_date = '2018-05-01'
+end_date = '2018-05-18'
 prefix = 'btc_'
-ticket = 'LTC-BTC'
-dir = 'data_ltc_btc/'
+ticket = 'BTC-EUR'
+dir = 'data_btc_eur/'
 
 df_adj_close = load_all_data_from_file2(prefix + 'etf_data_adj_close.csv', start_date, end_date)
 data = df_adj_close
@@ -60,15 +61,15 @@ data = data.reset_index(drop=True)
 print(data.head())
 
 plt.plot(data)
-plt.title(ticket+' pct')
+plt.title(ticket + ' pct')
 plt.show()
 
 plt.plot(data.pct_change())
-plt.title(ticket+' pct')
+plt.title(ticket + ' pct')
 plt.show()
 
 plt.plot(data.pct_change().cumsum())
-plt.legend(['b&h '+ticket])
+plt.legend(['b&h ' + ticket])
 plt.show()
 
 # exit(1)
@@ -82,12 +83,16 @@ max = None
 
 found = {}
 
+# clf_agent = CryptoTraderAgent(ticket, model='models_btc_eur/BTC_EUR_random_forrest_1.pkl')
+# clf_agent.invest(data, window=30)
 
-while len(found) < 20:
+while len(found) < 10:
     if len(data) < 30:
         continue
+    # agent = CryptoRandomAgent(ticket, use_trader=True, agent=clf_agent)
     agent = CryptoRandomAgent(ticket)
     agent.invest(data, window=30)
+    # exit(1)
     scores.append(agent.score)
 
     if max is None:
@@ -95,7 +100,9 @@ while len(found) < 20:
     if max.score < agent.score:
         max = agent
 
-    if agent.score > 0:
+    if agent.agent is None and agent.score > 0:
+        found[agent.score] = agent
+    elif agent.agent is not None and agent.score > agent.agent.score:
         found[agent.score] = agent
 
     print('\r %d : %d : %.2f : %d : %s' % (iter, agent.score, agent.ror_history[-1], len(found), ticket), end='')
@@ -123,9 +130,16 @@ print(x.shape)
 y = y_train
 print(y.shape)
 
+# if os.path.isfile(dir + 'x.npy'):
+#     xx = np.load(dir + 'x.npy')
+#     x = np.concatenate([x, xx])
+#
+# if os.path.isfile(dir + 'y.npy'):
+#     yy = np.load(dir + 'y.npy')
+#     y = np.concatenate([y, yy])
 
-np.save(dir+'x.npy', x)
-np.save(dir+'y.npy', y)
+np.save(dir + 'x.npy', x)
+np.save(dir + 'y.npy', y)
 
 df = pd.DataFrame(columns=['score', 'number_of_actions', 'ror'])
 

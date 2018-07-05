@@ -10,9 +10,9 @@ from etf_data_loader import load_all_data_from_file2
 import numpy as np
 import matplotlib.pyplot as plt
 
-dir_data = 'data_ltc_btc/'
-dir_models = 'models_ltc_btc/'
-ticket = 'LTC-BTC'
+dir_data = 'data_btc_eur/'
+dir_models = 'models_btc_eur/'
+ticket = 'BTC-EUR'
 # start_date = '2010-01-01'
 # start_date = '2017-10-01'
 start_date = '2017-01-01'
@@ -39,14 +39,6 @@ plt.show()
 
 data = df_ticket_data
 models = sorted(os.listdir(dir_models))
-# models = [
-#         'models_eu/btc_eur_adaboost_15.pkl',
-#         'models_eu/btc_eur_mlp_8.pkl',
-#         'models_eu/btc_eur_decision_tree_11.pkl',
-#         # 'keras_model_eu/lstm_1.h5',
-#         # 'keras_model_eu/mlp_2.h5',
-#         # 'keras_model_eu/mlp_3.h5',
-#         'keras_model_eu/mlpp_5.h5']
 
 legends = ['benchmark']
 

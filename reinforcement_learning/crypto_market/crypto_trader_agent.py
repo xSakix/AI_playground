@@ -31,6 +31,7 @@ def load_mlp_model(input_dim, model_src):
     model.load_weights(model_src)
     return model
 
+
 def load_mlpp_model(input_dim, model_src):
     model = Sequential()
 
@@ -42,7 +43,6 @@ def load_mlpp_model(input_dim, model_src):
 
     model.load_weights(model_src)
     return model
-
 
 
 def load_scaler(src):
@@ -87,11 +87,12 @@ class CryptoTraderAgent:
             self.iskeras = True
             self.ismlp = True
 
-        if model.startswith('models'):
+        if model.startswith('models') or model.startswith('best_models'):
             self.clf = joblib.load(model)
             self.iskeras = False
 
         self.coef = 0.5
+        self.scores = []
 
     def invest(self, data, window=30):
 
@@ -128,6 +129,8 @@ class CryptoTraderAgent:
 
             ror = (portfolio - self.invested) / self.invested
 
+            self.score_based_on_beating_benchmark(ror, bench[i])
+            self.scores.append(self.score)
             self.ror_history[i] = ror
 
             input = [[pct[i - 1],
@@ -183,3 +186,13 @@ class CryptoTraderAgent:
         df = pd.DataFrame(self.ror_history)
         df.fillna(method="bfill", inplace=True)
         self.ror_history = df.as_matrix()
+
+    def score_based_on_beating_benchmark(self, ror, benchmark, leverage=1.0):
+        if ror == 0.:
+            if sum(self.ror_history) == 0:
+                self.score -= 0.5
+        if len(self.actions) > 0:
+            if ror * leverage >= benchmark:
+                self.score += 1
+            elif ror * leverage < benchmark:
+                self.score -= 1

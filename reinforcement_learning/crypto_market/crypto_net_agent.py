@@ -1,9 +1,10 @@
 import os
 
 import numpy as np
-from keras import Sequential
+from keras import Sequential, Input, Model
 from keras.callbacks import EarlyStopping
-from keras.layers import Dense, GRU, RepeatVector, LSTM, Bidirectional, TimeDistributed, Dropout
+from keras.layers import Dense, GRU, RepeatVector, LSTM, Bidirectional, TimeDistributed, Dropout, Conv1D, \
+    GlobalAveragePooling1D, Merge, GlobalMaxPooling1D
 from keras.layers.advanced_activations import LeakyReLU
 from sklearn.externals import joblib
 from sklearn.model_selection import train_test_split
@@ -36,7 +37,7 @@ def get_model_lstm(input_shape):
 
     model.compile(
         optimizer='nadam',
-        loss='sparse_categorical_crossentropy',
+        loss='categorical_crossentropy',
         metrics=['acc']
     )
     print(model.summary())
@@ -55,8 +56,42 @@ def get_model_gru(input_shape):
     return model
 
 
+def get_cnn_model(input_shape):
+    x = Input(shape=input_shape)
+    conv_layers = []
+    for kernel_size in range(3, 5):
+        conv = Conv1D(filters=32, kernel_size=kernel_size, activation=LeakyReLU())(x)
+        conv = GlobalMaxPooling1D()(conv)
+        conv_layers.append(conv)
+
+    merged = Merge(mode='concat')(conv_layers)
+    output = Dense(1, activation='softmax')(merged)
+
+    model = Model(inputs=[x], outputs=[output])
+
+    model.compile(optimizer='nadam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+    print(model.summary())
+    return model
+
+
+def get_cnn2(input_shape):
+
+    model = Sequential()
+
+    model.add(Conv1D(32, 5, activation=LeakyReLU(), input_shape=input_shape,data_format='channels_last'))
+    model.add(GlobalMaxPooling1D())
+    model.add(Dense(1, activation='softmax'))
+
+    model.compile(optimizer='nadam', loss='categorical_crossentropy', metrics=['categorical_accuracy'])
+    print(model.summary())
+
+    return model
+
+
 print('loading data...')
-x_orig = np.load('x.npy')
+dir = 'data_btc_eur/'
+
+x_orig = np.load(dir + 'x.npy')
 x = x_orig
 print(x.shape)
 
@@ -67,7 +102,7 @@ else:
 
 x = np.nan_to_num(x)
 
-y_orig = np.load('y.npy')
+y_orig = np.load(dir + 'y.npy')
 print('reshaping data...')
 if len(x.shape) == 3:
     x = x[:, :, 2:7]
@@ -86,7 +121,7 @@ else:
 
 x = scaler.transform(x)
 # print(x.shape)
-# x = x.reshape(x.shape[0], 1, x.shape[1])
+x = x.reshape(x.shape[0], 1, x.shape[1])
 
 print(x.shape)
 
@@ -118,8 +153,11 @@ print(y.shape)
 x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=2)
 
 print('getting model...')
+model = get_cnn2((x.shape[1], x.shape[2]))
+# model = get_cnn_model((x.shape[1], x.shape[2]))
 # model = get_model_lstm((x.shape[1], x.shape[2]))
-model = get_model(x.shape[1])
+# model = get_model_lstm((x.shape[1], x.shape[2]))
+# model = get_model(x.shape[1])
 # model = get_model_gru((x.shape[1], x.shape[2]))
 
 print('training...')
