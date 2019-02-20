@@ -28,6 +28,15 @@ class CryptoTraderAgent:
         self.model = model
         self.clf = joblib.load(model)
         self.coef = coef
+        self.last_buy_price = None
+        self.last_sell_price = None
+        self.action_map = {1: 1, 2: 2}
+
+    def reverse_action_map(self):
+        if self.action_map[1] == 1:
+            self.action_map = {1: 2, 2: 1}
+        else:
+            self.action_map = {1: 1, 2: 2}
 
     def invest(self, data, window=30, debug=False):
 
@@ -50,7 +59,7 @@ class CryptoTraderAgent:
 
         self.ror_history = np.full(len(data) - window, 0.)
         self.history = np.full(len(data) - window, 0.)
-        self.r_actions = self.clf.predict(self.state[:, [0, 2, 3]])
+        self.r_actions = self.clf.predict(self.state)
         # print(self.r_actions)
 
         for i in range(window, len(data)):
@@ -69,16 +78,28 @@ class CryptoTraderAgent:
         self.history[i - window] = portfolio
         # print(portfolio)
         self.do_action(self.r_actions[i - window], portfolio, prices, debug)
+        self.decide_to_reverse_actions(self.r_actions[i - window],prices)
+
+    def decide_to_reverse_actions(self, action, prices):
+        SELL = 1
+        BUY = 2
+
+        if action == self.action_map[SELL]:
+            if self.last_buy_price is not None and self.last_buy_price > prices:
+                self.reverse_action_map()
+                print('reverting')
+        elif action == self.action_map[BUY]:
+            if self.last_sell_price is not None and self.last_sell_price < prices:
+                self.reverse_action_map()
+                print('reverting')
 
     def do_action(self, action, portfolio, prices, debug):
         SELL = 1
         BUY = 2
-        #reverted
-        # SELL = 2
-        # BUY = 1
-        if action == SELL:
+
+        if action == self.action_map[SELL]:
             return self.sell(prices, debug)
-        elif action == BUY:
+        elif action == self.action_map[BUY]:
             return self.buy(portfolio, prices, debug)
         else:
             return 0
@@ -98,6 +119,8 @@ class CryptoTraderAgent:
         self.shares += s
         self.cash = portfolio - self.shares * prices - cost
 
+        self.last_buy_price = prices
+
         return 2
 
     def sell(self, prices, debug):
@@ -113,6 +136,8 @@ class CryptoTraderAgent:
         self.cash += sold - sold * self.tr_cost
         self.shares = self.shares - to_sell
 
+        self.last_sell_price = prices
+
         return 1
 
 
@@ -122,13 +147,11 @@ if __name__ == '__main__':
     ticket = 'BTC-EUR'
     # model = 'models_ga_periodic/BTC_EUR_random_forrest_0.pkl'
     # model = '/home/martin/model/BTC_EUR_mlp_5.pkl'
-    # model = '/home/martin/model/BTC_EUR_random_forrest_4.pkl'
-    # model = '/home/martin/models_eu/BTC_EUR_random_forrest_49.pkl'
+    # model = '/home/martin/Projects/AI_playground/reinforcement_learning/crypto_market/learned_classifiers/20180916/BTC_EUR_random_forrest_4.pkl'
     model = '/home/martin/models_eu/BTC_EUR_random_forrest_558.pkl'
-
     data = load_all_data_from_file2('btc_etf_data_adj_close.csv', start_date, end_date)
 
-    agent = CryptoTraderAgent(ticket, model=model, invested=100.,coef=.5)
+    agent = CryptoTraderAgent(ticket, model=model, invested=100., coef=.5)
     window = 30
     agent.invest(data[ticket], window=window, debug=True)
     print('testing:', model, ' => score:', agent.score, '=> ror:', agent.ror_history[-1], ' mean ror => ',

@@ -1,54 +1,56 @@
-import multiprocessing
-import threading
 
 import numpy as np
-from reinforcement_learning.crypto_market.util import my_score
 import time
 
 
-class CryptoRandomAgent:
-    def __init__(self, ticket, data, states, invested=100000., agent=None, r_actions=np.empty(0), coef=0.5):
+class Agent:
+    def __init__(self, r_actions):
         self.r_actions = r_actions
-        self.score = 0
         self.ror_history = []
         self.dist = np.array([1.])
-        self.ticket = ticket
         self.tr_cost = 0.003
-        self.invested = invested
-        self.cash = invested
+        self.invested = 100000.
+        self.cash = 100000.
         self.shares = np.zeros(1)
         self.actions = []
         self.state = []
-        self.coef = coef
-        self.agent = agent
-        self.data = data
-        self.states = states
-        self.history = np.full(len(self.data) - self.states.window, fill_value=0.)
-        self.ror_history = np.full(len(self.data) - self.states.window, fill_value=0.)
+        self.coef = 1.
+        self.gamma = 0.3
 
-    def run(self):
-        for i in range(self.states.window, len(self.data)):
-            self.one_action_step(i)
+    def run(self, data, states):
+        window = states.window
+        data_window = len(data) - window
+        self.history = np.zeros(data_window)
+        self.ror_history = np.zeros(data_window)
+        self.rewards = np.zeros_like(self.ror_history)
+
+        for i in range(states.window, len(data)):
+            self.one_action_step(i, states.window, data)
 
         self.ror_history = (self.history - self.invested) / self.invested
-        self.ror_history = np.nan_to_num(self.ror_history)
+        if np.std(self.ror_history) != 0:
+            self.rewards = (self.ror_history - states.bench[window:]) / np.std(self.ror_history)
+        else:
+            self.rewards = np.zeros_like(self.ror_history)
 
-        try:
-            ror_agent = np.nan_to_num(np.copy(self.agent.ror_history))
-            self.score = my_score(self.ror_history, ror_agent)
-        except:
-            self.score = my_score(self.ror_history, self.states.bench)
+        self.disco_rewards = np.zeros_like(self.rewards)
+        running_add = 0
+        for t in reversed(range(0, len(self.rewards))):
+            running_add = running_add * self.gamma + self.rewards[t]
+            self.disco_rewards[t] = running_add
 
-        self.state = np.array(self.state)
+    def one_action_step(self, i, window, data):
+        action = self.r_actions[i - window]
+        prices = data[i]
 
-    def one_action_step(self, i):
-        action = self.r_actions[i - self.states.window]
-        prices = self.data.iloc[i]
+        if i == 0:
+            portfolio = self.cash + np.dot(prices, self.shares)
+        else:
+            portfolio = self.history[i - 1 - window]
+
+        self.do_action(action, portfolio, prices)
         portfolio = self.cash + np.dot(prices, self.shares)
-        self.history[i - self.states.window] = portfolio
-        self.state.append(self.states.get_state(i))
-        action = self.do_action(action, portfolio, prices)
-        self.r_actions[i - self.states.window] = action
+        self.history[i - window] = portfolio
 
     def do_action(self, action, portfolio, prices):
         if action == 1:
@@ -82,21 +84,6 @@ class CryptoRandomAgent:
         self.shares = self.shares - to_sell
 
         return 1
-
-    def score_based_on_ror(self, ror):
-        if ror > 0.:
-            self.score += 1
-
-    def score_based_on_beating_benchmark(self, ror, benchmark):
-        if ror > 0. and ror >= benchmark:
-            self.score += 1 + int(ror / benchmark)
-
-    def score_based_on_beating_trader(self, ror, ror_agent):
-        if ror > 0. and ror >= ror_agent:
-            try:
-                self.score += 1 + int(ror / ror_agent)
-            except:
-                self.score += 1
 
 
 if __name__ == "__main__":

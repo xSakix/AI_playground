@@ -2,6 +2,8 @@ import os
 from datetime import datetime
 
 from sklearn.preprocessing import LabelBinarizer
+
+from reinforcement_learning.crypto_market import crypto_sklearnclass_agent, crypto_bayes_agent
 from reinforcement_learning.crypto_market.crypto_random_agent import CryptoRandomAgent, State
 import sys
 
@@ -16,6 +18,11 @@ import matplotlib.pyplot as plt
 from choose_best_score_agent import find_best_models
 import pandas as pd
 
+from joblib import Parallel, delayed
+from joblib.pool import has_shareable_memory
+import time
+
+np.warnings.filterwarnings('ignore')
 
 def gen_random_date(year_low, year_high):
     y = np.random.randint(year_low, year_high)
@@ -24,57 +31,59 @@ def gen_random_date(year_low, year_high):
     return datetime(year=y, month=m, day=d)
 
 
-def get_data_random_dates(df_adj_close, min_year, max_year):
+def get_data_random_dates(min_year, max_year):
     rand_start = gen_random_date(min_year, max_year)
     rand_end = gen_random_date(min_year, max_year)
     if rand_start > rand_end:
         tmp = rand_start
         rand_start = rand_end
         rand_end = tmp
-    data = df_adj_close[df_adj_close['date'] > str(rand_start)]
-    data = data[data['date'] < str(rand_end)]
 
-    return data, rand_start, rand_end
+    return load_all_data_from_file2('btc_etf_data_adj_close.csv', str(rand_start), str(rand_end)), rand_start, rand_end
 
 
-dir = 'data_btc_eur/'
+start_date = '2017-01-01'
+end_date = '2018-07-01'
 
-x_file = dir + 'x.npy'
+ticket = 'BTC-EUR'
+window = 30
+
+it = 0
+dir_data = 'data_ga_periodic'
+
+classifier_scores = []
+classifier_rors = []
+classifier_acc_scores = []
+
+x_file = dir_data + '/x.npy'
+y_file = dir_data + '/y.npy'
+
 if os.path.isfile(x_file):
     print(x_file, ' removing...')
     os.remove(x_file)
 
-y_file = dir + 'y.npy'
 if os.path.isfile(y_file):
     print(y_file, ' removing...')
     os.remove(y_file)
 
-start_date = '2011-08-07'
-end_date = '2018-06-27'
-prefix = 'btc_'
-ticket = 'BTC-EUR'
-window = 30
-
-df_adj_close = load_all_data_from_file2(prefix + 'etf_data_adj_close.csv', start_date, end_date)
-
-it = 0
-
 while it < 100:
     print('Iteration:', it)
-    data, new_start_date, new_end_date = get_data_random_dates(df_adj_close, 2011, 2018)
+
+    data, start_date, end_date = get_data_random_dates(2011, 2018)
 
     while len(data) < 30:
-        data, new_start_date, new_end_date = get_data_random_dates(df_adj_close, 2011, 2018)
+        data, start_date, end_date = get_data_random_dates(2011, 2018)
 
-    print(new_start_date, ' - ', new_end_date)
+    print(start_date, ' - ', end_date)
     data = data[[ticket]]
     data = data.reset_index(drop=True)
     data.fillna(method="bfill", inplace=True)
     print(data.head(2))
     print(data.tail(2))
+    print(len(data))
 
-    pct = data.pct_change().as_matrix()
     bench = data.pct_change().cumsum().as_matrix()
+    pct = data.pct_change().as_matrix()
     data_1 = pd.DataFrame(pct)
     mean = data_1.rolling(window=window).mean().as_matrix()
     median = data_1.rolling(window=window).median().as_matrix()
@@ -84,8 +93,6 @@ while it < 100:
 
     states = State(window, pct, bench, mean, median, lowerbb, upperbb)
 
-    np.warnings.filterwarnings('ignore')
-
     iter = 0
     scores = []
 
@@ -93,28 +100,25 @@ while it < 100:
 
     found = {}
 
-    _, clf_agent, _ = find_best_models(start_date=str(new_start_date), end_date=str(new_end_date),
-                                       dir_models='models_btc_eur_6/')
-    print('Best score agent(%s - %s) is %s' % (new_start_date, new_end_date, clf_agent.model))
-
-    MAX_POP = 100
+    MAX_POP = 20
     COPY_SEL = 2
-    SELECTION = 50
+    SELECTION = 10
     MAX_ITER = 100
 
     MUTATION_RATE = 0.7
 
-    pop = [CryptoRandomAgent(ticket, use_trader=True, agent=clf_agent) for _ in range(MAX_POP)]
-    # pop = [CryptoRandomAgent(ticket, use_trader=False) for _ in range(MAX_POP)]
+    pop = [CryptoRandomAgent(ticket, use_trader=False) for _ in range(MAX_POP)]
 
     last_best = None
     last_5 = []
-    while iter < MAX_ITER:
+    while True:
         if len(data) < 30:
             continue
 
+        t1 = time.time()
         for agent in pop:
             agent.invest(data, states)
+        print(time.time() - t1)
 
         scores = [agent.score for agent in pop]
         sor = np.argsort(scores)
@@ -132,10 +136,12 @@ while it < 100:
             last_5 = []
             break
 
+        if iter >= MAX_ITER:
+            break
+
         newpop = []
         for index in idx[:COPY_SEL]:
-            newpop.append(CryptoRandomAgent(ticket, r_actions=pop[index].r_actions, use_trader=True, agent=clf_agent))
-            # newpop.append(CryptoRandomAgent(ticket, r_actions=pop[index].r_actions))
+            newpop.append(CryptoRandomAgent(ticket, r_actions=pop[index].r_actions))
 
         add = 0
         if last_best is not None and best.score - last_best.score == 0 and MUTATION_RATE >= 0.1:
@@ -161,13 +167,10 @@ while it < 100:
                 a[indexes] = np.random.randint(0, 3, size=mut_size)
                 b[indexes] = np.random.randint(0, 3, size=mut_size)
 
-            newpop.extend([CryptoRandomAgent(ticket, r_actions=a, use_trader=True, agent=clf_agent),
-                           CryptoRandomAgent(ticket, r_actions=b, use_trader=True, agent=clf_agent)])
-            # newpop.extend([CryptoRandomAgent(ticket, r_actions=a),
-            #                CryptoRandomAgent(ticket, r_actions=b)])
+            newpop.extend([CryptoRandomAgent(ticket, r_actions=a),
+                           CryptoRandomAgent(ticket, r_actions=b)])
             add += 2
         pop = newpop
-        # print('\r %d : %d : %.2f : %d : %s' % (iter, agent.score, agent.ror_history[-1], len(found), ticket), end='')
         print(iter, '->', score, ' | ', len(pop), ',', MUTATION_RATE)
         iter += 1
         last_best = best
@@ -192,3 +195,5 @@ while it < 100:
 
     np.save(x_file, x)
     np.save(y_file, y)
+
+print('data generation finished....')
